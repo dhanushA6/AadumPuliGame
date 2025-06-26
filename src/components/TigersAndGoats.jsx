@@ -1,12 +1,22 @@
 // App.jsx
 import React, { useEffect, useRef, useState } from 'react';
 import { GameState, arraysEqual } from '../utils/gameEngine.js';
-import '../App.css';
+import '../styles/TigerAndGoats.css';
+import timeIcon from '../images/timer.png';
 import BoardImg from '../images/Board.png';
 import TigerImg from '../images/Tiger.png';
 import GoatImg from '../images/Goat.png';
 import EmptyImg from '../images/Empty.png';
 import ComputerTypeOverlay from './ComputerTypeOverlay';
+import helpIcon from '../images/help.png'; 
+import HelpOverlay from './HelpOverlay';
+import goatBleatSound from '../sounds/goat_blead.mp3';
+import GameBGMusic from '../sounds/GameBG 14.mp3';
+import muteIcon from '../images/mute.png';
+import soundOnIcon from '../images/soundOn.png';
+import promoteSound from '../sounds/promote.mp3';
+import tickSound from '../sounds/ticktick.mp3';
+
 import {
   evaluateDetailedMoveQuality,
   isPositionVulnerable,
@@ -17,10 +27,19 @@ import {
   evaluateMoveQuality,
   selectMoveByDifficulty
 } from '../utils/gameUtils';
+import ResultOverlay from './ResultOverlay';
 
 const BOARD_WIDTH = 500;
 const BOARD_HEIGHT = 400;
-const PIECE_SIZE = 40;
+const PIECE_SIZE = 50;
+const BOARD_PADDING = 5; // Padding for gap between border and board image
+
+const FIXED_POSITIONS = [
+  [1, 231], [129, 24], [129, 148], [129, 204], [129, 261], [129, 310], [129, 435],
+  [191, 24], [191, 116], [191, 193], [191, 275], [191, 342], [191, 440],
+  [248, 24], [248, 85], [248, 183], [248, 289], [248, 376], [248, 435],
+  [354, 20], [354, 160], [354, 313], [354, 440]
+];
 
 const DIFFICULTY_LEVELS = {
   veryEasy: { 
@@ -53,6 +72,8 @@ const DIFFICULTY_LEVELS = {
   },
 };
 
+const GAME_TIME_LIMIT = 20; // 5 minutes in seconds
+
 function TigersAndGoats() {
   const [gameState, setGameState] = useState(null);
   const [isInProgress, setIsInProgress] = useState(false);
@@ -62,7 +83,7 @@ function TigersAndGoats() {
   const [isComputerThinking, setIsComputerThinking] = useState(false);
   const [showOverlay, setShowOverlay] = useState(true);
   const [selectedType, setSelectedType] = useState(0);
-  const [difficulty, setDifficulty] = useState('hard');
+  const [difficulty, setDifficulty] = useState('easy');
   
   // Move quality scoring states
   const [tigerScore, setTigerScore] = useState(0);
@@ -72,6 +93,8 @@ function TigersAndGoats() {
   const [lastMoveScore, setLastMoveScore] = useState(null);
   const [lastMovePlayer, setLastMovePlayer] = useState(null);
   const [lastMoveTo, setLastMoveTo] = useState(null);
+  const [elapsedTime, setElapsedTime] = useState(GAME_TIME_LIMIT);
+  const [isMusicMuted, setIsMusicMuted] = useState(false);
 
   const agentWorkerRef = useRef(null);
   const bestMoveRef = useRef(null);
@@ -79,19 +102,67 @@ function TigersAndGoats() {
   const allMovesRef = useRef(null);
   const timeoutRef = useRef(null);
   const outputRef = useRef();
+  const boardRef = useRef();
   const isInProgressRef = useRef(false);
   const isComputerThinkingRef = useRef(false);
   const computerPlaysAsRef = useRef(null);
+  const timerRef = useRef(null);
+  const [showHelpOverlay, setShowHelpOverlay] = useState(false);
+  const goatBleatRef = useRef(null);
+  const bgMusicRef = useRef(null);
+  const promoteRef = useRef(null);
+  const tickAudioRef = useRef(null);
 
   useEffect(() => { isInProgressRef.current = isInProgress; }, [isInProgress]);
   useEffect(() => { isComputerThinkingRef.current = isComputerThinking; }, [isComputerThinking]);
   useEffect(() => { computerPlaysAsRef.current = computerPlaysAs; }, [computerPlaysAs]);
-
+ 
   useEffect(() => {
     const initState = new GameState();
     setGameState(initState);
     setMoveHistory({ pointer: 0, states: [initState] });
   }, []);
+
+  // Timer effect
+  useEffect(() => {
+    if (isInProgress) {
+      timerRef.current = setInterval(() => {
+        setElapsedTime((prev) => {
+          if (prev > 0) return prev - 1;
+          else return 0;
+        });
+      }, 1000);
+    } else {
+      if (timerRef.current) clearInterval(timerRef.current);
+    }
+    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+  }, [isInProgress]);
+
+  // End game if timer reaches 0
+  useEffect(() => {
+    if (isInProgress && elapsedTime === 0) {
+      // End the game as draw
+      setIsInProgress(false);
+      setGameState((prev) => {
+        if (prev && prev.Result === -1) {
+          return { ...prev, Result: 3 };
+        }
+        return prev;
+      });
+    }
+  }, [elapsedTime, isInProgress]);
+
+  // Reset timer when game resets
+  useEffect(() => {
+    if (!isInProgress) setElapsedTime(GAME_TIME_LIMIT);
+  }, [isInProgress]);
+
+  // Format timer mm:ss
+  const formatTime = (seconds) => {
+    const mm = String(Math.floor(seconds / 60)).padStart(2, '0');
+    const ss = String(seconds % 60).padStart(2, '0');
+    return `${mm}:${ss}`;
+  };
 
   const handleUserClick = (id, className) => {
     if (!isInProgress || isComputerThinking || !gameState) return;
@@ -137,9 +208,22 @@ function TigersAndGoats() {
     const newGameState = currentGameState.generateSuccessor(action, historyForEngine);
     const currentPlayer = currentGameState.SideToPlay;
     
+    // Play goat bleat sound if a goat is captured
+    if (
+      newGameState.CapturedGoats > currentGameState.CapturedGoats &&
+      goatBleatRef.current
+    ) {
+      goatBleatRef.current.currentTime = 0;
+      goatBleatRef.current.play();
+    } else if (promoteRef.current) {
+      // Play promote sound for all other actions
+      promoteRef.current.currentTime = 0;
+      promoteRef.current.play();
+    }
+    
     // Calculate move quality score
     const moveQuality = evaluateDetailedMoveQuality(currentGameState, newGameState, action, currentPlayer);
-    
+    console.log(tigerScore, goatScore)
     // Update scores and move counts
     if (currentPlayer === 0) { // Tiger move
       setTigerScore(prev => prev + moveQuality.score);
@@ -201,7 +285,7 @@ function TigersAndGoats() {
   const computerPlay = (currentGameState) => {
     const legalActions = currentGameState.getLegalActions();
     const difficultySettings = DIFFICULTY_LEVELS[difficulty] || DIFFICULTY_LEVELS['medium'];
-  
+    
     setIsComputerThinking(true);
     
     const depthLimit = 20;
@@ -209,65 +293,99 @@ function TigersAndGoats() {
     
     // For very easy and easy, use immediate heuristic-based selection
     if (difficulty === 'veryEasy' || difficulty === 'easy') {
-      const selectedMove = selectMoveByDifficulty(currentGameState, legalActions, difficultySettings);
-      setTimeout(() => {
-        executeMove(selectedMove, currentGameState);
-        setIsComputerThinking(false);
-      }, 300 + Math.random() * 700); // Variable thinking time
-      return;
+        const selectedMove = selectMoveByDifficulty(currentGameState, legalActions, difficultySettings);
+        setTimeout(() => {
+            executeMove(selectedMove, currentGameState);
+            setIsComputerThinking(false);
+        }, 300 + Math.random() * 700); // Variable thinking time
+        return;
     }
-  
+    
     // For medium and hard, use AI but with difficulty modifications
     cleanupWorker();
     const worker = new Worker(new URL("../utils/Engine.worker.js", import.meta.url));
     agentWorkerRef.current = worker;
-  
+    
+    // Store all moves from different depths for medium difficulty
+    let allMovesFromDepths = [];
+    
     worker.onmessage = (e) => {
-      const [score, action, depth, allMoves] = e.data;
-      bestScoreRef.current = score;
-      bestMoveRef.current = action;
-      allMovesRef.current = allMoves;
-      
-      outputRef.current.value += `\nAgent: ${currentGameState.SideToPlay === 0 ? 'Tigers' : 'Goats'} | Depth: ${depth} | Score: ${score}`;
-      
-      // Apply difficulty-based move selection even with AI
-      let finalMove = action;
-      
-      if (difficulty === 'medium' && allMoves && allMoves.length > 1) {
-        // 20% of the time, don't take the best move (final action)
-        if (Math.random() < 0.2) {
-          // Pick a suboptimal move (not the best one)
-          const moveIndex = Math.min(1 + Math.floor(Math.random() * Math.min(2, allMoves.length - 1)), allMoves.length - 1);
-          finalMove = allMoves[moveIndex].action;
-          outputRef.current.value += ` | Selected suboptimal move rank: ${moveIndex + 1}`;
-        } else {
-          outputRef.current.value += ` | Selected best move`;
+        const [score, action, depth] = e.data;
+        
+        bestScoreRef.current = score;
+        bestMoveRef.current = action;
+        
+        // Store moves from each depth for medium difficulty analysis
+        allMovesFromDepths.push({ score, action, depth });
+        
+        outputRef.current.value += `\nAgent: ${currentGameState.SideToPlay === 0 ? 'Tigers' : 'Goats'} | Depth: ${depth} | Score: ${score}`;
+        
+        // Apply difficulty-based move selection even with AI
+        let finalMove = action; 
+     
+        if (difficulty === 'medium') {
+            // Check if this is every 5th move (assuming moveHistory tracks total moves)
+            const totalMoves = (currentGameState.SideToPlay === 0  ) ?tigerMoveCount : goatMoveCount;
+            const shouldMakeSuboptimalMove = (totalMoves %5 === 0); // Every 5th move (0-indexed)
+            console.log("shouldMakeSuboptimalMove", shouldMakeSuboptimalMove, totalMoves)
+            if (shouldMakeSuboptimalMove) {
+                // Find alternative moves that are not:
+                // 1. The best move from the deepest search
+                // 2. Capture moves (action[1] !== -1)
+                console.log('suboptimal');
+                const bestMoveFromDeepest = action;
+                const alternativeMoves = legalActions.filter(move => {
+                    // Not the best move from deepest search
+                    const notBestMove = !(move[0] === bestMoveFromDeepest[0] && 
+                                         move[1] === bestMoveFromDeepest[1] && 
+                                         move[2] === bestMoveFromDeepest[2]);
+                    
+                    // Not a capture move (assuming capture moves have action[1] !== -1)
+                    const notCaptureMove = move[1] === -1;
+                    
+                    return notBestMove && notCaptureMove;
+                });
+                console.log(alternativeMoves);
+                if (alternativeMoves.length > 0) {
+                    // Select a random alternative move or use some other heuristic
+                    // You could also pick the second-best non-capture move here
+                    finalMove = alternativeMoves[Math.floor(Math.random() * alternativeMoves.length)];
+                    bestMoveRef.current  = finalMove;
+                    console.log(`Medium difficulty: Making suboptimal move on turn ${totalMoves + 1}`); 
+                    // executeMove(finalMove, currentGameState);
+                    // return;
+                } else {
+                    // If no valid alternatives, fall back to best move
+                    finalMove = bestMoveFromDeepest;
+                    bestMoveRef.current  = finalMove;
+                    console.log(`Medium difficulty: No valid alternatives found, using best move`);
+                }
+            }
         }
-      }
-      
-      if (depth >= depthLimit) {
-        bestMoveRef.current = finalMove;
-        executeBestMove(currentGameState);
-      }
+        
+        if (depth >= depthLimit) {
+            bestMoveRef.current = finalMove;
+            executeBestMove(currentGameState);
+        }
     };
-  
+    
     worker.onerror = (error) => {
-      console.error("Worker error:", error);
-      // Fallback to heuristic selection
-      const fallbackMove = selectMoveByDifficulty(currentGameState, legalActions, difficultySettings);
-      executeMove(fallbackMove, currentGameState);
-      setIsComputerThinking(false);
-      cleanupWorker();
+        console.error("Worker error:", error);
+        // Fallback to heuristic selection
+        const fallbackMove = selectMoveByDifficulty(currentGameState, legalActions, difficultySettings);
+        executeMove(fallbackMove, currentGameState);
+        setIsComputerThinking(false);
+        cleanupWorker();
     };
-  
+    
     // Request both best move and alternative moves for difficulty adjustment
     worker.postMessage([currentGameState, "alphabetawithmemory", currentGameState.SideToPlay, moveHistory, true]);
     
     timeoutRef.current = setTimeout(() => {
-      console.log("Time limit reached, executing best move");
-      executeBestMove(currentGameState);
+        console.log("Time limit reached, executing best move");
+        executeBestMove(currentGameState);
     }, timeLimit); // true flag for requesting all moves
-  };
+};
   
   const executeBestMove = (currentGameState) => {
     const moveToExecute = bestMoveRef.current;
@@ -317,8 +435,219 @@ function TigersAndGoats() {
 
   useEffect(() => () => cleanupWorker(), []);
 
+  useEffect(() => {
+    if (bgMusicRef.current) {
+      bgMusicRef.current.muted = isMusicMuted;
+      if (!isMusicMuted) {
+        bgMusicRef.current.play().catch(() => {});
+      } else {
+        bgMusicRef.current.pause();
+      }
+    }
+  }, [isMusicMuted]);
+
+  // Optionally, auto-play on mount
+  useEffect(() => {
+    if (bgMusicRef.current) {
+      bgMusicRef.current.volume = 0.5;
+      bgMusicRef.current.loop = true;
+      bgMusicRef.current.play().catch(() => {});
+    }
+  }, []);
+
+  const handleMusicToggle = () => {
+    setIsMusicMuted((prev) => !prev);
+  };
+
+  // Play ticking sound in last 10 seconds
+  useEffect(() => {
+    if (!tickAudioRef.current) return;
+    if (isInProgress && elapsedTime > 0 && elapsedTime <= 10) {
+      tickAudioRef.current.loop = true;
+      tickAudioRef.current.currentTime = 0;
+      tickAudioRef.current.play().catch(() => {});
+    } else {
+      tickAudioRef.current.pause();
+      tickAudioRef.current.currentTime = 0;
+    }
+  }, [elapsedTime, isInProgress]);
+
   return (
-    <div className="game-container">
+    <div className="tng-root">
+      {/* Audio for goat bleat */}
+      <audio ref={goatBleatRef} src={goatBleatSound} preload="auto" />
+      {/* Audio for promote (action) */}
+      <audio ref={promoteRef} src={promoteSound} preload="auto" />
+      {/* Background music */}
+      <audio ref={bgMusicRef} src={GameBGMusic} preload="auto" loop />
+      {/* Ticking sound for last 10 seconds */}
+      <audio ref={tickAudioRef} src={tickSound} preload="auto" />
+      {/* Navbar */}
+      <div className="tng-navbar">
+        {/* Left: (empty for now) */}
+        <div style={{ flex: 1 }}></div>
+        {/* Center: Timer */}
+        <div style={{ flex: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: 120 }}>
+          <div className="stats-bar__item">
+            <img src={timeIcon} alt="Timer" className="stats-bar__icon" />
+            <div className={`stats-bar__value ${elapsedTime <= 10 ? 'stats-bar__value--critical' : ''}`}>{formatTime(elapsedTime)}</div>
+          </div>
+        </div>
+        {/* Right: Music and Help buttons */}
+        <div style={{ display: 'flex', alignItems: 'center', flex: 1, justifyContent: 'flex-end' }}>
+          <button 
+            className="tool-btn active"
+            onClick={handleMusicToggle}
+            title={isMusicMuted ? 'Unmute Music' : 'Mute Music'}
+          >
+            <img src={isMusicMuted ? muteIcon : soundOnIcon} alt="Music Toggle" className="tool-icon" />
+          </button>
+          <button 
+            className="tool-btn active"
+            onClick={() => setShowHelpOverlay(true)}
+            title="Help"
+          >
+            <img src={helpIcon} alt="Help" className="tool-icon" />
+          </button>
+        </div>
+      </div>
+      <div className="tng-main-flex">
+        {/* Details on the right */}
+         <div className="tng-details-wrapper">
+          {gameState && (
+            <div className="game-info">
+              <div className="game-status">
+                <div className="turn-frame">
+                  <div style={{ position: 'relative', display: 'inline-block' }}>
+                    <img 
+                      src={gameState.SideToPlay === 0 ? TigerImg : GoatImg} 
+                      alt={gameState.SideToPlay === 0 ? "Tiger's Turn" : "Goat's Turn"}
+                      className="turn-indicator"
+                    />
+                    <span className="turn-count">{gameState.SideToPlay === 0 ? 'Tiger' : 'Goat'}</span>
+                  </div>
+                  <div className="turn-label">Current Turn</div>
+                </div>
+                <div className="goat-status-row">
+                  <div className="goat-frame">
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                      <div className="goat-counter" style={{ position: 'relative', display: 'inline-block' }}>
+                        <img 
+                          src={GoatImg} 
+                          alt="Available Goat" 
+                          className="status-goat available"
+                        />
+                        <span className="goat-count">{gameState.OutsideGoats}</span>
+                      </div>
+                      <div className="goat-label" style={{ marginTop: '1.2rem' }}>Available</div>
+                    </div>
+                  </div>
+                  <div className="goat-frame">
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                      <div className="goat-counter" style={{ position: 'relative', display: 'inline-block' }}>
+                        <img 
+                          src={GoatImg} 
+                          alt="Captured Goat" 
+                          className="status-goat captured"
+                        />
+                        <span className="goat-count">{gameState.CapturedGoats}</span>
+                      </div>
+                      <div className="goat-label" style={{ marginTop: '1.2rem' }}>Captured</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              {isComputerThinking && (
+                <div className="thinking-indicator">
+                  <div className="thinking-dot"></div>
+                  <div className="thinking-dot"></div>
+                  <div className="thinking-dot"></div>
+                </div>
+              )}
+            </div>
+          )}
+          <textarea ref={outputRef} readOnly style={{ width: '100%', height: '100px', marginTop: '20px', display:'none'}}></textarea>
+        </div> 
+        {/* Board on the left */}
+        <div className="tng-board-wrapper">
+          <div
+            style={{
+              width: BOARD_WIDTH + BOARD_PADDING * 2,
+              height: BOARD_HEIGHT + BOARD_PADDING * 2,
+              border: '14px solid #3e2f23',
+              borderRadius: '12px',
+              boxShadow: 'inset 0 0 10px rgba(0,0,0,0.3), 0 10px 30px rgba(0,0,0,0.5)',
+              background: "url('https://www.transparenttextures.com/patterns/wood-pattern.png')",
+              backgroundSize: 'cover',
+              overflow: 'hidden',
+              position: 'relative',
+              display: 'inline-block',
+              padding: BOARD_PADDING,
+              boxSizing: 'content-box',
+            }}
+          >
+            <svg
+              width={BOARD_WIDTH}
+              height={BOARD_HEIGHT}
+              viewBox={`0 0 ${BOARD_WIDTH} ${BOARD_HEIGHT}`}
+              style={{ display: 'block', borderRadius: '12px' }}
+            >
+              {/* Board background image without filter for visibility */}
+              <defs>
+                <filter id="pieceGlow" x="-50%" y="-50%" width="200%" height="200%">
+                  <feGaussianBlur stdDeviation="4" result="coloredBlur"/>
+                  <feMerge>
+                    <feMergeNode in="coloredBlur"/>
+                    <feMergeNode in="SourceGraphic"/>
+                  </feMerge>
+                </filter>
+              </defs>
+              <image
+                href={BoardImg}
+                x={0}
+                y={0}
+                width={BOARD_WIDTH}
+                height={BOARD_HEIGHT}
+                preserveAspectRatio="none"
+              />
+              {/* Pieces */}
+              {gameState && gameState.CurrentPosition.map((piece, i) => {
+                const [top, left] = FIXED_POSITIONS[i];
+                const className = piece === 'G' ? 'Goat' : piece === 'T' ? 'Tiger' : 'Empty';
+                const isSelected = selectedId === i;
+                const isLastMove = lastMoveTo === i;
+                const pieceImg = className === 'Goat' ? GoatImg : className === 'Tiger' ? TigerImg : EmptyImg;
+                return (
+                  <g key={i} onClick={() => handleUserClick(i, className)} style={{ cursor: 'pointer' }}>
+                    {/* Border circle for selection/last move */}
+                    {(isSelected || isLastMove) && (
+                      <circle
+                      cx={left + PIECE_SIZE / 2}
+                      cy={top + PIECE_SIZE / 2}
+                      r={PIECE_SIZE / 2 + 2}
+                      fill="none"
+                      stroke={isSelected ? 'yellow' : '#ffd800'}
+                      strokeWidth="5"
+                      filter={isLastMove ? 'url(#pieceGlow)' : undefined}
+                    />
+                    )}
+                    {/* Piece image */}
+                    <image
+                      href={pieceImg}
+                      x={left}
+                      y={top}
+                      width={PIECE_SIZE}
+                      height={PIECE_SIZE}
+                    />
+                  </g>
+                );
+              })}
+            </svg>
+          </div>
+        </div>
+        
+      </div>
+      {/* Overlay remains above everything */}
       {showOverlay && (
         <ComputerTypeOverlay
           selectedType={selectedType}
@@ -328,116 +657,22 @@ function TigersAndGoats() {
           onStart={handleOverlayStart}
         />
       )}
-      <div className="board" style={{ width: BOARD_WIDTH, height: BOARD_HEIGHT }}>
-        <img src={BoardImg} alt="Board" className="board-img" />
-        {gameState && gameState.CurrentPosition.map((piece, i) => {
-          const [top, left] = getPositionByIndex(i);
-          const className = piece === 'G' ? 'Goat' : piece === 'T' ? 'Tiger' : 'Empty';
-          const isSelected = selectedId === i;
-          const isLastMove = lastMoveTo === i;
-          const pieceImg = className === 'Goat' ? GoatImg : className === 'Tiger' ? TigerImg : EmptyImg;
-          return (
-            <img
-              key={i}
-              src={pieceImg}
-              className={`piece ${className} ${isSelected ? 'selected' : ''} ${isLastMove ? 'last-move' : ''}`}
-              style={{ top, left, width: PIECE_SIZE, height: PIECE_SIZE, border: isSelected ? '2px solid yellow' : 'none' }}
-              onClick={() => handleUserClick(i, className)}
-            />
-          );
-        })}
-      </div>
-      <div className="controls">
-        {gameState && (
-          <div className="game-info">
-            <p>Side to Play: {gameState.SideToPlay === 0 ? 'Tigers' : 'Goats'}</p>
-            <p>Goats Left to Place: {gameState.OutsideGoats}</p>
-            <p>Goats Captured: {gameState.CapturedGoats}</p>
-            <p>Difficulty: {difficulty.charAt(0).toUpperCase() + difficulty.slice(1)}</p>
-            
-            {/* Move Quality Scoring Display */}
-            <div className="scoring-section" style={{ 
-              marginTop: '15px', 
-              padding: '10px', 
-              border: '2px solid #333', 
-              borderRadius: '8px',
-              backgroundColor: '#f5f5f5'
-            }}>
-              <h4 style={{ margin: '0 0 10px 0', color: '#333' }}>Move Quality Scores</h4>
-              
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
-                <div style={{ 
-                  padding: '5px 10px', 
-                  backgroundColor: '#ff6b35', 
-                  color: 'white', 
-                  borderRadius: '5px',
-                  minWidth: '120px',
-                  textAlign: 'center'
-                }}>
-                  <strong>🐅 Tigers</strong><br/>
-                  Score: {tigerScore}<br/>
-                  Moves: {tigerMoveCount}<br/>
-                  Avg: {tigerMoveCount > 0 ? Math.round(tigerScore / tigerMoveCount) : 0}
-                </div>
-                
-                <div style={{ 
-                  padding: '5px 10px', 
-                  backgroundColor: '#4CAF50', 
-                  color: 'white', 
-                  borderRadius: '5px',
-                  minWidth: '120px',
-                  textAlign: 'center'
-                }}>
-                  <strong>🐐 Goats</strong><br/>
-                  Score: {goatScore}<br/>
-                  Moves: {goatMoveCount}<br/>
-                  Avg: {goatMoveCount > 0 ? Math.round(goatScore / goatMoveCount) : 0}
-                </div>
-              </div>
-              
-              {lastMoveScore !== null && (
-                <div style={{ 
-                  padding: '8px', 
-                  backgroundColor: lastMovePlayer === 'Tiger' ? '#ffe6e6' : '#e6ffe6',
-                  borderRadius: '5px',
-                  textAlign: 'center',
-                  border: '1px solid #ddd'
-                }}>
-                  <strong>Last Move:</strong> {lastMovePlayer} scored <strong>{lastMoveScore}</strong> points
-                </div>
-              )}
-            </div>
-            
-            {gameState.Result !== -1 && (
-              <div style={{ marginTop: '10px' }}>
-                <p style={{ color: 'red', fontWeight: 'bold', fontSize: '18px' }}>
-                  Game Over! {gameState.Result === 0 ? 'Tigers Win!' : gameState.Result === 1 ? 'Goats Win!' : 'Draw!'}
-                </p>
-                <p style={{ color: '#666', fontSize: '14px' }}>
-                  Final Performance: Tigers avg {tigerMoveCount > 0 ? Math.round(tigerScore / tigerMoveCount) : 0} | 
-                  Goats avg {goatMoveCount > 0 ? Math.round(goatScore / goatMoveCount) : 0}
-                </p>
-              </div>
-            )}
-            
-            {isComputerThinking && <p style={{ color: 'blue' }}>Computer is thinking...</p>}
-          </div>
+      {/* Result Overlay */}
+      {gameState && gameState.Result !== -1 && (
+        <ResultOverlay
+          result={gameState.Result}
+          onClose={resetGame}
+          TigerImg={TigerImg}
+          GoatImg={GoatImg}
+          tigerScore={tigerScore}
+          goatScore={goatScore}
+        />
+      )}
+      {showHelpOverlay && (
+          <HelpOverlay onClose={() => setShowHelpOverlay(false)} />
         )}
-        <button onClick={resetGame}>Reset</button>
-        <textarea ref={outputRef} readOnly style={{ width: '100%', height: '100px' }}></textarea>
-      </div>
     </div>
   );
-}
-
-function getPositionByIndex(index) {
-  const positions = [
-    [0, 231], [129, 24], [129, 148], [129, 204], [129, 261], [129, 310], [129, 435],
-    [191, 24], [191, 116], [191, 193], [191, 275], [191, 342], [191, 440],
-    [253, 24], [253, 85], [253, 183], [253, 289], [253, 376], [253, 435],
-    [370, 20], [370, 160], [370, 313], [370, 440]
-  ];
-  return positions[index] || [0, 0];
 }
 
 export default TigersAndGoats;

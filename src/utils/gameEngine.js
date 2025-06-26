@@ -27,7 +27,9 @@ class GameState {
     this.SideToPlay = 1;
     this.OutsideGoats = 15;
     this.CapturedGoats = 0;
-    this.CurrentPosition = ['T', 'E', 'E', 'T', 'T', 'E', 'E', 'E', 'E', 'E', 'E', 'E', 'E', 'E', 'E', 'E', 'E', 'E', 'E', 'E', 'E', 'E', 'E'];
+    this.CurrentPosition = ['T', 'E', 'E', 'T', 'T', 'E', 'E', 'E', 'E', 'E', 'E', 'E', 'E', 'E', 'E', 'E', 'E', 'E', 'E', 'E', 'E', 'E', 'E']; 
+    // this.CurrentPosition = Array(23).fill('G');
+
     this.Hash = 0;
     this.Result = -1;
   }
@@ -115,7 +117,7 @@ class GameState {
       if (history.InternalArray[i].Hash === state.Hash) numEquals++;
       if (numEquals > 1) {
         state.Result = 2; 
-        console.log("draw")
+      
         break;
       }
     }

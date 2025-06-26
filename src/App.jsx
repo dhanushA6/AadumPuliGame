@@ -3,6 +3,7 @@ import React, { useEffect, useState, useRef } from "react";
 import { HashRouter as Router, Route, Routes } from "react-router-dom";
 import axios from "axios";
 import "./index.css";
+import HomePage from './pages/HomePage';
 import ReactDOM from "react-dom/client";
 import TigersAndGoats from "./components/TigersAndGoats";
 
@@ -15,9 +16,9 @@ const App = () => {
       future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
     >
       <Routes>
-       
+      <Route path="/" element={<HomePage />} />
         <Route
-          path="/"
+          path="/game"
           element={
             <TigersAndGoats/>
           }

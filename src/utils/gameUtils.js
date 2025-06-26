@@ -15,8 +15,8 @@ export function canJumpTo(from, over) {
   return -1;
 }
 
+// Checks if a goat at a given position can be captured by any tiger
 export function isPositionVulnerable(gameState, position) {
-  const adjacentPositions = getAdjacentPositions(position);
   for (let tigerPos = 0; tigerPos < gameState.CurrentPosition.length; tigerPos++) {
     if (gameState.CurrentPosition[tigerPos] === 'T') {
       const jumpPos = canJumpTo(tigerPos, position);
@@ -28,6 +28,7 @@ export function isPositionVulnerable(gameState, position) {
   return false;
 }
 
+// Counts the number of tigers that have no legal moves
 export function countBlockedTigers(gameState) {
   let blockedCount = 0;
   for (let i = 0; i < gameState.CurrentPosition.length; i++) {
@@ -39,17 +40,109 @@ export function countBlockedTigers(gameState) {
   return blockedCount;
 }
 
+// Calculates how many goats are adjacent to a given position
 export function calculateGoatConnectivity(gameState, position) {
   const adjacent = getAdjacentPositions(position);
   return adjacent.filter(pos => gameState.CurrentPosition[pos] === 'G').length;
 }
 
+// Evaluates move quality quickly, for sorting and basic AI behavior
+export function evaluateMoveQuality(gameState, action) {
+  const tempGameState = gameState.generateSuccessor(action, { Pointer: 0, InternalArray: [] });
+  let score = 0;
+  const fromPos = action[0];
+  const toPos = action[2];
+
+  if (gameState.CurrentPlayer === 0) {
+    if (action[1] !== -1) score += 100;
+    const centerPositions = [8, 9, 10, 14, 15, 16];
+    if (centerPositions.includes(toPos)) score += 20;
+    const edgePositions = [0, 1, 6, 7, 12, 13, 19, 22];
+    if (edgePositions.includes(toPos)) score += 10;
+  } else {
+    if (gameState.OutsideGoats > 0) {
+      if (isPositionVulnerable(tempGameState, toPos)) {
+        score -= 100;
+      } else {
+        score += 20;
+      }
+    } else {
+      if (isPositionVulnerable(gameState, fromPos) && !isPositionVulnerable(tempGameState, toPos)) {
+        score += 40;
+      }
+    }
+    const connectivity = calculateGoatConnectivity(tempGameState, toPos);
+    score += connectivity * 5;
+
+    const centerPositions = [8, 9, 10, 14, 15, 16];
+    if (centerPositions.includes(toPos)) score += 10;
+  }
+
+  return score;
+}
+
+// Selects a move based on difficulty settings
+export function selectMoveByDifficulty(gameState, legalActions, difficultySettings) {
+  // Defensive logic: avoid vulnerable goat placements during placement
+  if (gameState.CurrentPlayer === 1 && gameState.OutsideGoats > 0) {
+    const safeMoves = legalActions.filter(action => {
+      const toPos = action[2];
+      const tempState = gameState.generateSuccessor(action, { Pointer: 0, InternalArray: [] });
+      return !isPositionVulnerable(tempState, toPos);
+    });
+
+    if (safeMoves.length > 0) {
+      legalActions = safeMoves;
+    }
+  }
+
+  const moveEvaluations = legalActions.map(action => ({
+    action,
+    score: evaluateMoveQuality(gameState, action)
+  }));
+
+  moveEvaluations.sort((a, b) => b.score - a.score);
+
+  if (difficultySettings.avoidBestMoves && moveEvaluations.length > 2) {
+    const worseHalf = moveEvaluations.slice(Math.floor(moveEvaluations.length / 2));
+    return worseHalf[Math.floor(Math.random() * worseHalf.length)].action;
+  }
+
+  if (difficultySettings.useSuboptimalMoves) {
+    const shouldUseSuboptimal = Math.random() < difficultySettings.suboptimalChance;
+    if (shouldUseSuboptimal && moveEvaluations.length > 1) {
+      const suboptimalMoves = moveEvaluations.slice(1);
+      const selectedMove = suboptimalMoves[Math.floor(Math.random() * suboptimalMoves.length)];
+      return selectedMove.action;
+    }
+  }
+
+  if (difficultySettings.evaluationNoise > 0) {
+    moveEvaluations.forEach(moveEval => {
+      const noise = (Math.random() - 0.5) * difficultySettings.evaluationNoise;
+      moveEval.score += noise;
+    });
+    moveEvaluations.sort((a, b) => b.score - a.score);
+  }
+
+  if (difficultySettings.preferDefensive) {
+    const defensiveMoves = moveEvaluations.filter(moveEval => moveEval.action[1] === -1);
+    if (defensiveMoves.length > 0 && Math.random() < 0.4) {
+      return defensiveMoves[0].action;
+    }
+  }
+
+  return moveEvaluations[0].action;
+}
+
+// Evaluates a move with full explanation and scoring breakdown
 export function evaluateDetailedMoveQuality(beforeState, afterState, action, player) {
   let score = 0;
   let scoreDetails = [];
   score += 10;
   scoreDetails.push("Base move: +10");
-  if (player === 0) {
+
+  if (player === 0) { // Tiger
     if (action[1] !== -1) {
       score += 100;
       scoreDetails.push("Capture: +100");
@@ -81,7 +174,7 @@ export function evaluateDetailedMoveQuality(beforeState, afterState, action, pla
       score += 30;
       scoreDetails.push("Endgame advantage: +30");
     }
-  } else {
+  } else { // Goat
     if (beforeState.OutsideGoats > 0) {
       const toPos = action[2];
       const centerPositions = [8, 9, 10, 14, 15, 16];
@@ -117,6 +210,7 @@ export function evaluateDetailedMoveQuality(beforeState, afterState, action, pla
         scoreDetails.push("Good formation: +20");
       }
     }
+
     const tigerThreats = beforeState.getLegalActions().filter(act => act[1] !== -1 && beforeState.CurrentPosition[act[0]] === 'T').length;
     const afterThreats = afterState.getLegalActions().filter(act => act[1] !== -1 && afterState.CurrentPosition[act[0]] === 'T').length;
     if (afterThreats < tigerThreats) {
@@ -128,6 +222,7 @@ export function evaluateDetailedMoveQuality(beforeState, afterState, action, pla
       scoreDetails.push("Survival bonus: +35");
     }
   }
+
   if (afterState.Result !== -1 && afterState.Result !== player) {
     score -= 200;
     scoreDetails.push("Losing move: -200");
@@ -136,57 +231,6 @@ export function evaluateDetailedMoveQuality(beforeState, afterState, action, pla
     score += 200;
     scoreDetails.push("Winning move: +200");
   }
+
   return { score: Math.max(0, score), details: scoreDetails };
 }
-
-export function evaluateMoveQuality(gameState, action) {
-  const tempGameState = gameState.generateSuccessor(action, { Pointer: 0, InternalArray: [] });
-  let score = 0;
-  if (action[1] !== -1) {
-    score += 100;
-  }
-  const fromPos = action[0];
-  const toPos = action[2];
-  const centerPositions = [8, 9, 10, 14, 15, 16];
-  if (centerPositions.includes(toPos)) score += 20;
-  const edgePositions = [0, 1, 6, 7, 12, 13, 19, 22];
-  if (edgePositions.includes(toPos)) score += 10;
-  return score;
-}
-
-export function selectMoveByDifficulty(gameState, legalActions, difficultySettings) {
-  const moveEvaluations = legalActions.map(action => ({
-    action,
-    score: evaluateMoveQuality(gameState, action)
-  }));
-  moveEvaluations.sort((a, b) => b.score - a.score);
-  if (difficultySettings.avoidBestMoves && moveEvaluations.length > 2) {
-    const worseHalf = moveEvaluations.slice(Math.floor(moveEvaluations.length / 2));
-    return worseHalf[Math.floor(Math.random() * worseHalf.length)].action;
-  }
-  if (difficultySettings.useSuboptimalMoves) {
-    const shouldUseSuboptimal = Math.random() < difficultySettings.suboptimalChance;
-    if (shouldUseSuboptimal && moveEvaluations.length > 1) {
-      const suboptimalMoves = moveEvaluations.slice(1);
-      const selectedMove = suboptimalMoves[Math.floor(Math.random() * suboptimalMoves.length)];
-      return selectedMove.action;
-    }
-  }
-  if (difficultySettings.evaluationNoise > 0) {
-    moveEvaluations.forEach(moveEval => {
-      const noise = (Math.random() - 0.5) * difficultySettings.evaluationNoise;
-      moveEval.score += noise;
-    });
-    moveEvaluations.sort((a, b) => b.score - a.score);
-  }
-  if (difficultySettings.preferDefensive) {
-    const defensiveMoves = moveEvaluations.filter(moveEval => {
-      const action = moveEval.action;
-      return action[1] === -1;
-    });
-    if (defensiveMoves.length > 0 && Math.random() < 0.4) {
-      return defensiveMoves[0].action;
-    }
-  }
-  return moveEvaluations[0].action;
-} 
