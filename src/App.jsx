@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useRef } from "react";
 import { HashRouter as Router, Route, Routes } from "react-router-dom";
 import axios from "axios";
@@ -6,9 +5,40 @@ import "./index.css";
 import HomePage from './pages/HomePage';
 import ReactDOM from "react-dom/client";
 import TigersAndGoats from "./components/TigersAndGoats";
+import { preloadImages, preloadSounds } from "./utils/preloadAssets";
 
 const App = () => {
+ 
+  const [userID, setUserID] = useState(51);
+  const [levelValue, setLevelValue] = useState(9); 
+  // const [mode, setMode] = useState('freeplay');
+  const [error, setError] = useState(null);
 
+  useEffect(() => {
+    preloadImages();
+    preloadSounds();
+  }, []);
+
+  useEffect(() => {
+    const handlePostMessage = (event) => {
+      if (event.data && event.data.userID && event.data.levelValue) {
+        const { userID, levelValue } = event.data;
+        setUserID(userID);
+        setLevelValue(levelValue);
+        // setMode(mode);
+        console.log("Received userID:", userID, "levelValue:", levelValue);
+      } else {
+        console.warn("Invalid message received:", event.data);
+      }
+    };
+
+    window.addEventListener("message", handlePostMessage);
+
+    return () => {
+      window.removeEventListener("message", handlePostMessage);
+    };
+  }, []); 
+  
 
   return (
     <Router
@@ -20,7 +50,15 @@ const App = () => {
         <Route
           path="/game"
           element={
-            <TigersAndGoats/>
+            <TigersAndGoats
+              userID={userID}
+              level={levelValue}
+              difficulty={
+                levelValue <= 5 ? 'easy' :
+                levelValue <= 8 ? 'medium' :
+                'hard'
+              }
+            />
           }
         />
       </Routes>

@@ -15,7 +15,8 @@ import GameBGMusic from '../sounds/GameBG 14.mp3';
 import muteIcon from '../images/mute.png';
 import soundOnIcon from '../images/soundOn.png';
 import promoteSound from '../sounds/promote.mp3';
-import tickSound from '../sounds/ticktick.mp3';
+import tickSound from '../sounds/ticktick.mp3'; 
+
 
 import {
   evaluateDetailedMoveQuality,
@@ -33,7 +34,7 @@ const BOARD_WIDTH = 500;
 const BOARD_HEIGHT = 400;
 const PIECE_SIZE = 50;
 const BOARD_PADDING = 5; // Padding for gap between border and board image
-
+const  GAME_TIME_LIMIT = 300;
 const FIXED_POSITIONS = [
   [1, 231], [129, 24], [129, 148], [129, 204], [129, 261], [129, 310], [129, 435],
   [191, 24], [191, 116], [191, 193], [191, 275], [191, 342], [191, 440],
@@ -72,9 +73,8 @@ const DIFFICULTY_LEVELS = {
   },
 };
 
-const GAME_TIME_LIMIT = 20; // 5 minutes in seconds
 
-function TigersAndGoats() {
+function TigersAndGoats({ userID, level, difficulty: propDifficulty }) {
   const [gameState, setGameState] = useState(null);
   const [isInProgress, setIsInProgress] = useState(false);
   const [selectedId, setSelectedId] = useState(-1);
@@ -83,7 +83,8 @@ function TigersAndGoats() {
   const [isComputerThinking, setIsComputerThinking] = useState(false);
   const [showOverlay, setShowOverlay] = useState(true);
   const [selectedType, setSelectedType] = useState(0);
-  const [difficulty, setDifficulty] = useState('easy');
+  const [difficulty, setDifficulty] = useState(propDifficulty || 'hard'); 
+ 
   
   // Move quality scoring states
   const [tigerScore, setTigerScore] = useState(0);
@@ -95,6 +96,8 @@ function TigersAndGoats() {
   const [lastMoveTo, setLastMoveTo] = useState(null);
   const [elapsedTime, setElapsedTime] = useState(GAME_TIME_LIMIT);
   const [isMusicMuted, setIsMusicMuted] = useState(false);
+  const [lastUserProb, setLastUserProb] = useState(0);
+  const [showResultOverlay, setShowResultOverlay] = useState(false);
 
   const agentWorkerRef = useRef(null);
   const bestMoveRef = useRef(null);
@@ -153,9 +156,9 @@ function TigersAndGoats() {
   }, [elapsedTime, isInProgress]);
 
   // Reset timer when game resets
-  useEffect(() => {
-    if (!isInProgress) setElapsedTime(GAME_TIME_LIMIT);
-  }, [isInProgress]);
+  // useEffect(() => {
+  //   if (!isInProgress) setElapsedTime(GAME_TIME_LIMIT);
+  // }, [isInProgress]);
 
   // Format timer mm:ss
   const formatTime = (seconds) => {
@@ -256,6 +259,15 @@ function TigersAndGoats() {
     if (newGameState.Result !== -1) {
       setIsInProgress(false);
       setIsComputerThinking(false);
+      let userSide = (computerPlaysAs === 0) ? 1 : 0;
+      let totalScore = Math.abs(tigerScore) + Math.abs(goatScore);
+      let userProb = 0;
+      if (totalScore > 0) {
+        userProb = Math.round((userSide === 0 ? tigerScore : goatScore) / totalScore * 100);
+        userProb = Math.max(0, Math.min(100, userProb));
+      } 
+      console.log("Score", userProb)
+      setLastUserProb(userProb);
       return;
     }
     
@@ -472,6 +484,91 @@ function TigersAndGoats() {
     }
   }, [elapsedTime, isInProgress]);
 
+  // Show userID, level, mode, and difficulty in bottom left for testing
+  const debugInfo = (
+    <div style={{
+      position: 'fixed',
+      bottom: 10,
+      left: 10,
+      zIndex: 9999,
+      background: 'rgba(255,255,255,0.85)',
+      borderRadius: 8,
+      padding: 8,
+      fontSize: 15,
+      boxShadow: '0 2px 8px #b8860b44',
+      color: '#7c5a1a',
+      fontFamily: 'monospace',
+    }}>
+      <div>UserID: {userID}</div>
+      <div>Level: {level}</div>
+      <div>Difficulty: {difficulty}</div>
+    </div>
+  );
+
+  // Send game result to parent window when game ends
+  useEffect(() => { 
+    console.log("Game over")
+    if (!gameState || gameState.Result === -1) return;
+    
+    // Determine user side (0 = Tiger, 1 = Goat)
+    const userSide = (computerPlaysAs === 0) ? 1 : 0;
+
+    // Get probability/advantage for timeout (from lastUserProb)
+
+    let points = 0;
+    if (
+      (gameState.Result === 0 && userSide === 0) ||
+      (gameState.Result === 1 && userSide === 1)
+    ) {
+      points = 100;
+    } else if (gameState.Result === 2) {
+      points = 50;
+    } else if (gameState.Result === 3) { 
+
+      let userSide = (computerPlaysAs === 0) ? 1 : 0;
+      let totalScore = Math.abs(tigerScore) + Math.abs(goatScore);
+      let userProb = 0;
+      if (totalScore > 0) {
+        userProb = Math.round((userSide === 0 ? tigerScore : goatScore) / totalScore * 100);
+        userProb = Math.max(0, Math.min(100, userProb));
+      } 
+      console.log("Score", userProb)
+      setLastUserProb(userProb);
+      points = Math.round(userProb || 0);
+    } else {
+      points = 0;
+    }
+
+    // Calculate time taken
+    const timeTaken = GAME_TIME_LIMIT - elapsedTime;
+
+    const gameResult = {
+      type: "levelComplete",
+      data: {
+        level: level,
+        timeTaken: timeTaken,
+        points: points,
+      },
+    };
+
+    window.parent.postMessage(gameResult, "*");
+    
+  }, [gameState && gameState.Result]);
+
+  // Show result overlay with delay after game ends
+  useEffect(() => {
+    if (!gameState) return;
+    if (gameState.Result !== -1) {
+      setShowResultOverlay(false);
+      const timeout = setTimeout(() => {
+        setShowResultOverlay(true);
+      }, 700); // 700ms delay
+      return () => clearTimeout(timeout);
+    } else {
+      setShowResultOverlay(false);
+    }
+  }, [gameState && gameState.Result]);
+
   return (
     <div className="tng-root">
       {/* Audio for goat bleat */}
@@ -487,14 +584,14 @@ function TigersAndGoats() {
         {/* Left: (empty for now) */}
         <div style={{ flex: 1 }}></div>
         {/* Center: Timer */}
-        <div style={{ flex: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: 120 }}>
+        <div style={{ flex: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: 100 }}>
           <div className="stats-bar__item">
             <img src={timeIcon} alt="Timer" className="stats-bar__icon" />
             <div className={`stats-bar__value ${elapsedTime <= 10 ? 'stats-bar__value--critical' : ''}`}>{formatTime(elapsedTime)}</div>
           </div>
         </div>
         {/* Right: Music and Help buttons */}
-        <div style={{ display: 'flex', alignItems: 'center', flex: 1, justifyContent: 'flex-end' }}>
+        <div style={{ display: 'flex', alignItems: '', flex: 1, justifyContent: 'flex-end' }}>
           <button 
             className="tool-btn active"
             onClick={handleMusicToggle}
@@ -524,9 +621,9 @@ function TigersAndGoats() {
                       alt={gameState.SideToPlay === 0 ? "Tiger's Turn" : "Goat's Turn"}
                       className="turn-indicator"
                     />
-                    <span className="turn-count">{gameState.SideToPlay === 0 ? 'Tiger' : 'Goat'}</span>
+                    <span className="turn-count">{gameState.SideToPlay === 0 ? 'புலி' : 'ஆடு'}</span>
                   </div>
-                  <div className="turn-label">Current Turn</div>
+                  <div className="turn-label"><>யார்<br/>ஆட்டம்?</></div>
                 </div>
                 <div className="goat-status-row">
                   <div className="goat-frame">
@@ -539,7 +636,7 @@ function TigersAndGoats() {
                         />
                         <span className="goat-count">{gameState.OutsideGoats}</span>
                       </div>
-                      <div className="goat-label" style={{ marginTop: '1.2rem' }}>Available</div>
+                      <div className="goat-label" style={{ marginTop: '1.2rem' }}>கொட்டில்</div>
                     </div>
                   </div>
                   <div className="goat-frame">
@@ -548,11 +645,12 @@ function TigersAndGoats() {
                         <img 
                           src={GoatImg} 
                           alt="Captured Goat" 
-                          className="status-goat captured"
+                          style={{ filter: 'grayscale(100%) brightness(0.7)' }}
+                          className="status-goat captured" 
                         />
                         <span className="goat-count">{gameState.CapturedGoats}</span>
                       </div>
-                      <div className="goat-label" style={{ marginTop: '1.2rem' }}>Captured</div>
+                      <div className="goat-label" style={{ marginTop: '1.2rem' }}>பிடிபட்டவை</div>
                     </div>
                   </div>
                 </div>
@@ -569,8 +667,7 @@ function TigersAndGoats() {
           <textarea ref={outputRef} readOnly style={{ width: '100%', height: '100px', marginTop: '20px', display:'none'}}></textarea>
         </div> 
         {/* Board on the left */}
-        <div className="tng-board-wrapper">
-          <div
+        <div className="tng-board-wrapper"
             style={{
               width: BOARD_WIDTH + BOARD_PADDING * 2,
               height: BOARD_HEIGHT + BOARD_PADDING * 2,
@@ -584,66 +681,66 @@ function TigersAndGoats() {
               display: 'inline-block',
               padding: BOARD_PADDING,
               boxSizing: 'content-box',
+              opacity: 1,
             }}
+        >
+          <svg
+            width={BOARD_WIDTH}
+            height={BOARD_HEIGHT}
+            viewBox={`0 0 ${BOARD_WIDTH} ${BOARD_HEIGHT}`}
+            style={{ display: 'block', borderRadius: '12px' }}
           >
-            <svg
+            {/* Board background image without filter for visibility */}
+            <defs>
+              <filter id="pieceGlow" x="-50%" y="-50%" width="200%" height="200%">
+                <feGaussianBlur stdDeviation="4" result="coloredBlur"/>
+                <feMerge>
+                  <feMergeNode in="coloredBlur"/>
+                  <feMergeNode in="SourceGraphic"/>
+                </feMerge>
+              </filter>
+            </defs>
+            <image
+              href={BoardImg}
+              x={0}
+              y={0}
               width={BOARD_WIDTH}
               height={BOARD_HEIGHT}
-              viewBox={`0 0 ${BOARD_WIDTH} ${BOARD_HEIGHT}`}
-              style={{ display: 'block', borderRadius: '12px' }}
-            >
-              {/* Board background image without filter for visibility */}
-              <defs>
-                <filter id="pieceGlow" x="-50%" y="-50%" width="200%" height="200%">
-                  <feGaussianBlur stdDeviation="4" result="coloredBlur"/>
-                  <feMerge>
-                    <feMergeNode in="coloredBlur"/>
-                    <feMergeNode in="SourceGraphic"/>
-                  </feMerge>
-                </filter>
-              </defs>
-              <image
-                href={BoardImg}
-                x={0}
-                y={0}
-                width={BOARD_WIDTH}
-                height={BOARD_HEIGHT}
-                preserveAspectRatio="none"
-              />
-              {/* Pieces */}
-              {gameState && gameState.CurrentPosition.map((piece, i) => {
-                const [top, left] = FIXED_POSITIONS[i];
-                const className = piece === 'G' ? 'Goat' : piece === 'T' ? 'Tiger' : 'Empty';
-                const isSelected = selectedId === i;
-                const isLastMove = lastMoveTo === i;
-                const pieceImg = className === 'Goat' ? GoatImg : className === 'Tiger' ? TigerImg : EmptyImg;
-                return (
-                  <g key={i} onClick={() => handleUserClick(i, className)} style={{ cursor: 'pointer' }}>
-                    {/* Border circle for selection/last move */}
-                    {(isSelected || isLastMove) && (
-                      <circle
-                      cx={left + PIECE_SIZE / 2}
-                      cy={top + PIECE_SIZE / 2}
-                      r={PIECE_SIZE / 2 + 2}
-                      fill="none"
-                      stroke={isSelected ? 'yellow' : '#ffd800'}
-                      strokeWidth="5"
-                      filter={isLastMove ? 'url(#pieceGlow)' : undefined}
-                    />
-                    )}
-                    {/* Piece image */}
-                    <image
-                      href={pieceImg}
-                      x={left}
-                      y={top}
-                      width={PIECE_SIZE}
-                      height={PIECE_SIZE}
-                    />
-                  </g>
-                );
-              })}
-            </svg>
-          </div>
+              preserveAspectRatio="none"
+            />
+            {/* Pieces */}
+            {gameState && gameState.CurrentPosition.map((piece, i) => {
+              const [top, left] = FIXED_POSITIONS[i];
+              const className = piece === 'G' ? 'Goat' : piece === 'T' ? 'Tiger' : 'Empty';
+              const isSelected = selectedId === i;
+              const isLastMove = lastMoveTo === i;
+              const pieceImg = className === 'Goat' ? GoatImg : className === 'Tiger' ? TigerImg : EmptyImg;
+              return (
+                <g key={i} onClick={() => handleUserClick(i, className)} style={{ cursor: 'pointer' }}>
+                  {/* Border circle for selection/last move */}
+                  {(isSelected || isLastMove) && (
+                    <circle
+                    cx={left + PIECE_SIZE / 2}
+                    cy={top + PIECE_SIZE / 2}
+                    r={PIECE_SIZE / 2 + 2}
+                    fill="none"
+                    stroke={isSelected ? 'yellow' : '#ffd800'}
+                    strokeWidth="5"
+                    filter={isLastMove ? 'url(#pieceGlow)' : undefined}
+                  />
+                  )}
+                  {/* Piece image */}
+                  <image
+                    href={pieceImg}
+                    x={left}
+                    y={top}
+                    width={PIECE_SIZE}
+                    height={PIECE_SIZE}
+                  />
+                </g>
+              );
+            })}
+          </svg>
         </div>
         
       </div>
@@ -658,7 +755,7 @@ function TigersAndGoats() {
         />
       )}
       {/* Result Overlay */}
-      {gameState && gameState.Result !== -1 && (
+      {showResultOverlay && gameState && gameState.Result !== -1 && (
         <ResultOverlay
           result={gameState.Result}
           onClose={resetGame}
@@ -666,11 +763,13 @@ function TigersAndGoats() {
           GoatImg={GoatImg}
           tigerScore={tigerScore}
           goatScore={goatScore}
+          computerPlaysAs = {computerPlaysAs}
         />
       )}
       {showHelpOverlay && (
           <HelpOverlay onClose={() => setShowHelpOverlay(false)} />
         )}
+      {debugInfo}
     </div>
   );
 }

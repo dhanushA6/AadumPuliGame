@@ -144,7 +144,8 @@ export function evaluateDetailedMoveQuality(beforeState, afterState, action, pla
 
   if (player === 0) { // Tiger
     if (action[1] !== -1) {
-      score += 100;
+      if (afterState.CapturedGoats >=5) score += 10000;
+      else score += 100;
       scoreDetails.push("Capture: +100");
     }
     const toPos = action[2];
