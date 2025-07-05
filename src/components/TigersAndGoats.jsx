@@ -34,7 +34,7 @@ const BOARD_WIDTH = 500;
 const BOARD_HEIGHT = 400;
 const PIECE_SIZE = 50;
 const BOARD_PADDING = 5; // Padding for gap between border and board image
-const  GAME_TIME_LIMIT = 300;
+const  GAME_TIME_LIMIT = 60;
 const FIXED_POSITIONS = [
   [1, 231], [129, 24], [129, 148], [129, 204], [129, 261], [129, 310], [129, 435],
   [191, 24], [191, 116], [191, 193], [191, 275], [191, 342], [191, 440],
