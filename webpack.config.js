@@ -55,6 +55,13 @@ module.exports = (_, argv) => ({
           filename: "audio/[name][ext]", // Output audio files to the "audio/" directory
         },
       },
+      {
+        test: /\.(mp4|webm|ogg|mov|avi)$/i, // Match video files
+        type: "asset/resource",
+        generator: {
+          filename: "videos/[name][ext]", // Output video files to the "videos/" directory
+        },
+      },
 
       // JavaScript (ES6 and JSX) files handling
       {

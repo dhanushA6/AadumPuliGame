@@ -2,20 +2,19 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { GameState, arraysEqual } from '../utils/gameEngine.js';
 import '../styles/TigerAndGoats.css';
-import timeIcon from '../images/timer.png';
-import BoardImg from '../images/Board.png';
+
 import TigerImg from '../images/Tiger.png';
 import GoatImg from '../images/Goat.png';
-import EmptyImg from '../images/Empty.png';
+
 import ComputerTypeOverlay from './ComputerTypeOverlay';
-import helpIcon from '../images/help.png'; 
 import HelpOverlay from './HelpOverlay';
 import goatBleatSound from '../sounds/goat_blead.mp3';
 import GameBGMusic from '../sounds/GameBG 14.mp3';
-import muteIcon from '../images/mute.png';
-import soundOnIcon from '../images/soundOn.png';
+
 import promoteSound from '../sounds/promote.mp3';
 import tickSound from '../sounds/ticktick.mp3'; 
+import BoardBackground from './BoardBackground';
+
 
 
 import {
@@ -34,7 +33,7 @@ const BOARD_WIDTH = 500;
 const BOARD_HEIGHT = 400;
 const PIECE_SIZE = 50;
 const BOARD_PADDING = 5; // Padding for gap between border and board image
-const  GAME_TIME_LIMIT = 60;
+const  GAME_TIME_LIMIT = 300;
 const FIXED_POSITIONS = [
   [1, 231], [129, 24], [129, 148], [129, 204], [129, 261], [129, 310], [129, 435],
   [191, 24], [191, 116], [191, 193], [191, 275], [191, 342], [191, 440],
@@ -111,6 +110,7 @@ function TigersAndGoats({ userID, level, difficulty: propDifficulty }) {
   const computerPlaysAsRef = useRef(null);
   const timerRef = useRef(null);
   const [showHelpOverlay, setShowHelpOverlay] = useState(false);
+  const [wasAudioPlaying, setWasAudioPlaying] = useState(false);
   const goatBleatRef = useRef(null);
   const bgMusicRef = useRef(null);
   const promoteRef = useRef(null);
@@ -128,7 +128,7 @@ function TigersAndGoats({ userID, level, difficulty: propDifficulty }) {
 
   // Timer effect
   useEffect(() => {
-    if (isInProgress) {
+    if (isInProgress && !showHelpOverlay) {
       timerRef.current = setInterval(() => {
         setElapsedTime((prev) => {
           if (prev > 0) return prev - 1;
@@ -139,7 +139,7 @@ function TigersAndGoats({ userID, level, difficulty: propDifficulty }) {
       if (timerRef.current) clearInterval(timerRef.current);
     }
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
-  }, [isInProgress]);
+  }, [isInProgress, showHelpOverlay]);
 
   // End game if timer reaches 0
   useEffect(() => {
@@ -330,7 +330,9 @@ function TigersAndGoats({ userID, level, difficulty: propDifficulty }) {
         // Store moves from each depth for medium difficulty analysis
         allMovesFromDepths.push({ score, action, depth });
         
-        outputRef.current.value += `\nAgent: ${currentGameState.SideToPlay === 0 ? 'Tigers' : 'Goats'} | Depth: ${depth} | Score: ${score}`;
+        if (outputRef.current) {
+          outputRef.current.value += `\nAgent: ${currentGameState.SideToPlay === 0 ? 'Tigers' : 'Goats'} | Depth: ${depth} | Score: ${score}`;
+        }
         
         // Apply difficulty-based move selection even with AI
         let finalMove = action; 
@@ -450,13 +452,13 @@ function TigersAndGoats({ userID, level, difficulty: propDifficulty }) {
   useEffect(() => {
     if (bgMusicRef.current) {
       bgMusicRef.current.muted = isMusicMuted;
-      if (!isMusicMuted) {
+      if (!isMusicMuted && !showHelpOverlay) {
         bgMusicRef.current.play().catch(() => {});
       } else {
         bgMusicRef.current.pause();
       }
     }
-  }, [isMusicMuted]);
+  }, [isMusicMuted, showHelpOverlay]);
 
   // Optionally, auto-play on mount
   useEffect(() => {
@@ -471,10 +473,26 @@ function TigersAndGoats({ userID, level, difficulty: propDifficulty }) {
     setIsMusicMuted((prev) => !prev);
   };
 
+  const handleHelpClick = () => {
+    // Store current audio state before opening help
+    if (bgMusicRef.current) {
+      setWasAudioPlaying(!bgMusicRef.current.paused && !isMusicMuted);
+    }
+    setShowHelpOverlay(true);
+  };
+
+  const handleHelpClose = () => {
+    setShowHelpOverlay(false);
+    // Resume audio if it was playing before help was opened
+    if (wasAudioPlaying && bgMusicRef.current && !isMusicMuted) {
+      bgMusicRef.current.play().catch(() => {});
+    }
+  };
+
   // Play ticking sound in last 10 seconds
   useEffect(() => {
     if (!tickAudioRef.current) return;
-    if (isInProgress && elapsedTime > 0 && elapsedTime <= 10) {
+    if (isInProgress && !showHelpOverlay && elapsedTime > 0 && elapsedTime <= 10) {
       tickAudioRef.current.loop = true;
       tickAudioRef.current.currentTime = 0;
       tickAudioRef.current.play().catch(() => {});
@@ -482,7 +500,16 @@ function TigersAndGoats({ userID, level, difficulty: propDifficulty }) {
       tickAudioRef.current.pause();
       tickAudioRef.current.currentTime = 0;
     }
-  }, [elapsedTime, isInProgress]);
+  }, [elapsedTime, isInProgress, showHelpOverlay]);
+
+  // Calculate real-time user win chance
+  let userWinChance = 0;
+  const totalScore = Math.abs(tigerScore) + Math.abs(goatScore);
+  const userSide = (computerPlaysAs === 0) ? 1 : 0;
+  if (totalScore > 0) {
+    userWinChance = Math.round((userSide === 0 ? tigerScore : goatScore) / totalScore * 100);
+    userWinChance = Math.max(0, Math.min(100, userWinChance));
+  }
 
   // Show userID, level, mode, and difficulty in bottom left for testing
   const debugInfo = (
@@ -570,7 +597,22 @@ function TigersAndGoats({ userID, level, difficulty: propDifficulty }) {
   }, [gameState && gameState.Result]);
 
   return (
-    <div className="tng-root">
+    <div className="tng-root" style={{ position: 'relative', overflow: 'hidden' }}>
+      <BoardBackground 
+        onMuteClick={handleMusicToggle}
+        onHelpClick={handleHelpClick}
+        isMuted={isMusicMuted}
+        timerValue={formatTime(elapsedTime)}
+        winChanceValue={userWinChance}
+        timerCritical={elapsedTime <= 10}
+        gameState={gameState}
+        selectedId={selectedId}
+        lastMoveTo={lastMoveTo}
+        handleUserClick={handleUserClick}
+        PIECE_SIZE={PIECE_SIZE}
+        FIXED_POSITIONS={FIXED_POSITIONS}
+        isComputerThinking={isComputerThinking}
+      />
       {/* Audio for goat bleat */}
       <audio ref={goatBleatRef} src={goatBleatSound} preload="auto" />
       {/* Audio for promote (action) */}
@@ -580,169 +622,9 @@ function TigersAndGoats({ userID, level, difficulty: propDifficulty }) {
       {/* Ticking sound for last 10 seconds */}
       <audio ref={tickAudioRef} src={tickSound} preload="auto" />
       {/* Navbar */}
-      <div className="tng-navbar">
-        {/* Left: (empty for now) */}
-        <div style={{ flex: 1 }}></div>
-        {/* Center: Timer */}
-        <div style={{ flex: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: 100 }}>
-          <div className="stats-bar__item">
-            <img src={timeIcon} alt="Timer" className="stats-bar__icon" />
-            <div className={`stats-bar__value ${elapsedTime <= 10 ? 'stats-bar__value--critical' : ''}`}>{formatTime(elapsedTime)}</div>
-          </div>
-        </div>
-        {/* Right: Music and Help buttons */}
-        <div style={{ display: 'flex', alignItems: '', flex: 1, justifyContent: 'flex-end' }}>
-          <button 
-            className="tool-btn active"
-            onClick={handleMusicToggle}
-            title={isMusicMuted ? 'Unmute Music' : 'Mute Music'}
-          >
-            <img src={isMusicMuted ? muteIcon : soundOnIcon} alt="Music Toggle" className="tool-icon" />
-          </button>
-          <button 
-            className="tool-btn active"
-            onClick={() => setShowHelpOverlay(true)}
-            title="Help"
-          >
-            <img src={helpIcon} alt="Help" className="tool-icon" />
-          </button>
-        </div>
-      </div>
+   
       <div className="tng-main-flex">
-        {/* Details on the right */}
-         <div className="tng-details-wrapper">
-          {gameState && (
-            <div className="game-info">
-              <div className="game-status">
-                <div className="turn-frame">
-                  <div style={{ position: 'relative', display: 'inline-block' }}>
-                    <img 
-                      src={gameState.SideToPlay === 0 ? TigerImg : GoatImg} 
-                      alt={gameState.SideToPlay === 0 ? "Tiger's Turn" : "Goat's Turn"}
-                      className="turn-indicator"
-                    />
-                    <span className="turn-count">{gameState.SideToPlay === 0 ? 'புலி' : 'ஆடு'}</span>
-                  </div>
-                  <div className="turn-label"><>யார்<br/>ஆட்டம்?</></div>
-                </div>
-                <div className="goat-status-row">
-                  <div className="goat-frame">
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                      <div className="goat-counter" style={{ position: 'relative', display: 'inline-block' }}>
-                        <img 
-                          src={GoatImg} 
-                          alt="Available Goat" 
-                          className="status-goat available"
-                        />
-                        <span className="goat-count">{gameState.OutsideGoats}</span>
-                      </div>
-                      <div className="goat-label" style={{ marginTop: '1.2rem' }}>கொட்டில்</div>
-                    </div>
-                  </div>
-                  <div className="goat-frame">
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                      <div className="goat-counter" style={{ position: 'relative', display: 'inline-block' }}>
-                        <img 
-                          src={GoatImg} 
-                          alt="Captured Goat" 
-                          style={{ filter: 'grayscale(100%) brightness(0.7)' }}
-                          className="status-goat captured" 
-                        />
-                        <span className="goat-count">{gameState.CapturedGoats}</span>
-                      </div>
-                      <div className="goat-label" style={{ marginTop: '1.2rem' }}>பிடிபட்டவை</div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              {isComputerThinking && (
-                <div className="thinking-indicator">
-                  <div className="thinking-dot"></div>
-                  <div className="thinking-dot"></div>
-                  <div className="thinking-dot"></div>
-                </div>
-              )}
-            </div>
-          )}
-          <textarea ref={outputRef} readOnly style={{ width: '100%', height: '100px', marginTop: '20px', display:'none'}}></textarea>
-        </div> 
-        {/* Board on the left */}
-        <div className="tng-board-wrapper"
-            style={{
-              width: BOARD_WIDTH + BOARD_PADDING * 2,
-              height: BOARD_HEIGHT + BOARD_PADDING * 2,
-              border: '14px solid #3e2f23',
-              borderRadius: '12px',
-              boxShadow: 'inset 0 0 10px rgba(0,0,0,0.3), 0 10px 30px rgba(0,0,0,0.5)',
-              background: "url('https://www.transparenttextures.com/patterns/wood-pattern.png')",
-              backgroundSize: 'cover',
-              overflow: 'hidden',
-              position: 'relative',
-              display: 'inline-block',
-              padding: BOARD_PADDING,
-              boxSizing: 'content-box',
-              opacity: 1,
-            }}
-        >
-          <svg
-            width={BOARD_WIDTH}
-            height={BOARD_HEIGHT}
-            viewBox={`0 0 ${BOARD_WIDTH} ${BOARD_HEIGHT}`}
-            style={{ display: 'block', borderRadius: '12px' }}
-          >
-            {/* Board background image without filter for visibility */}
-            <defs>
-              <filter id="pieceGlow" x="-50%" y="-50%" width="200%" height="200%">
-                <feGaussianBlur stdDeviation="4" result="coloredBlur"/>
-                <feMerge>
-                  <feMergeNode in="coloredBlur"/>
-                  <feMergeNode in="SourceGraphic"/>
-                </feMerge>
-              </filter>
-            </defs>
-            <image
-              href={BoardImg}
-              x={0}
-              y={0}
-              width={BOARD_WIDTH}
-              height={BOARD_HEIGHT}
-              preserveAspectRatio="none"
-            />
-            {/* Pieces */}
-            {gameState && gameState.CurrentPosition.map((piece, i) => {
-              const [top, left] = FIXED_POSITIONS[i];
-              const className = piece === 'G' ? 'Goat' : piece === 'T' ? 'Tiger' : 'Empty';
-              const isSelected = selectedId === i;
-              const isLastMove = lastMoveTo === i;
-              const pieceImg = className === 'Goat' ? GoatImg : className === 'Tiger' ? TigerImg : EmptyImg;
-              return (
-                <g key={i} onClick={() => handleUserClick(i, className)} style={{ cursor: 'pointer' }}>
-                  {/* Border circle for selection/last move */}
-                  {(isSelected || isLastMove) && (
-                    <circle
-                    cx={left + PIECE_SIZE / 2}
-                    cy={top + PIECE_SIZE / 2}
-                    r={PIECE_SIZE / 2 + 2}
-                    fill="none"
-                    stroke={isSelected ? 'yellow' : '#ffd800'}
-                    strokeWidth="5"
-                    filter={isLastMove ? 'url(#pieceGlow)' : undefined}
-                  />
-                  )}
-                  {/* Piece image */}
-                  <image
-                    href={pieceImg}
-                    x={left}
-                    y={top}
-                    width={PIECE_SIZE}
-                    height={PIECE_SIZE}
-                  />
-                </g>
-              );
-            })}
-          </svg>
-        </div>
-        
+        {/* Details on the right removed, now in SVG */}
       </div>
       {/* Overlay remains above everything */}
       {showOverlay && (
@@ -767,9 +649,9 @@ function TigersAndGoats({ userID, level, difficulty: propDifficulty }) {
         />
       )}
       {showHelpOverlay && (
-          <HelpOverlay onClose={() => setShowHelpOverlay(false)} />
+          <HelpOverlay onClose={handleHelpClose} />
         )}
-      {debugInfo}
+      {/* {debugInfo} */}
     </div>
   );
 }

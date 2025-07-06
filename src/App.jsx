@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from "react";
 import { HashRouter as Router, Route, Routes } from "react-router-dom";
-import axios from "axios";
+import './App.css'
 import "./index.css";
 import HomePage from './pages/HomePage';
 import ReactDOM from "react-dom/client";
@@ -10,7 +10,7 @@ import { preloadImages, preloadSounds } from "./utils/preloadAssets";
 const App = () => {
  
   const [userID, setUserID] = useState(51);
-  const [levelValue, setLevelValue] = useState(9); 
+  const [levelValue, setLevelValue] = useState(4); 
   // const [mode, setMode] = useState('freeplay');
   const [error, setError] = useState(null);
 

@@ -1,5 +1,4 @@
 import React from 'react';
-import '../App.css';
 import TigerImg from '../images/Tiger.png';
 import GoatImg from '../images/Goat.png';
 
