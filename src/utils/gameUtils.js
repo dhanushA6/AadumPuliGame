@@ -1,5 +1,41 @@
 import { MoveActions, CaptureActions } from './gameEngine';
 
+
+
+ const getLegalActions = (gameState)=>{
+    const actions = [];
+   
+      if (gameState.OutsideGoats > 0) {
+        gameState.CurrentPosition.forEach((p, i) => {
+          if (p === "E") actions.push([-1, -1, i]);
+        });
+      } else {
+        gameState.CurrentPosition.forEach((p, i) => {
+          if (p === "G") {
+            for (const move of MoveActions[i]) {
+              if (gameState.CurrentPosition[move] === "E") actions.push([i, -1, move]);
+            }
+          }
+        });
+      }
+   
+      gameState.CurrentPosition.forEach((p, i) => {
+        if (p === "T") {
+          for (const cap of CaptureActions) {
+            if (cap[0] === i && gameState.CurrentPosition[cap[1]] === "G" && gameState.CurrentPosition[cap[2]] === "E")
+              actions.push(cap);
+          }
+          for (const move of MoveActions[i]) {
+            if (gameState.CurrentPosition[move] === "E") actions.push([i, -1, move]);
+          }
+        }
+      });
+    
+    return actions;
+  };
+
+
+
 // Returns all adjacent positions for a given board index
 export function getAdjacentPositions(position) {
   return MoveActions[position] || [];
@@ -33,7 +69,7 @@ export function countBlockedTigers(gameState) {
   let blockedCount = 0;
   for (let i = 0; i < gameState.CurrentPosition.length; i++) {
     if (gameState.CurrentPosition[i] === 'T') {
-      const moves = gameState.getLegalActions().filter(act => act[0] === i);
+      const moves = getLegalActions(gameState).filter(act => act[0] === i);
       if (moves.length === 0) blockedCount++;
     }
   }
@@ -137,6 +173,7 @@ export function selectMoveByDifficulty(gameState, legalActions, difficultySettin
 
 // Evaluates a move with full explanation and scoring breakdown
 export function evaluateDetailedMoveQuality(beforeState, afterState, action, player) {
+
   let score = 0;
   let scoreDetails = [];
   score += 10;
@@ -152,21 +189,22 @@ export function evaluateDetailedMoveQuality(beforeState, afterState, action, pla
     const centerPositions = [8, 9, 10, 14, 15, 16];
     const strategicPositions = [1, 2, 3, 4, 5, 7, 11, 12, 13, 17, 18, 19, 20, 21, 22];
     if (centerPositions.includes(toPos)) {
-      score += 25;
-      scoreDetails.push("Center control: +25");
+      score += 5;
+      scoreDetails.push("Center control: +5");
     } else if (strategicPositions.includes(toPos)) {
-      score += 15;
-      scoreDetails.push("Strategic position: +15");
+      score += 5;
+      scoreDetails.push("Strategic position: +5");
     }
-    const tigerMobility = afterState.getLegalActions().filter(act => afterState.CurrentPosition[act[0]] === 'T').length;
-    if (tigerMobility > 3) {
+    const tigerMobility = getLegalActions(afterState).filter(act => afterState.CurrentPosition[act[0]] === 'T').length;
+
+    if (tigerMobility >=3) {
       score += 20;
       scoreDetails.push("High mobility: +20");
     } else if (tigerMobility < 2) {
       score -= 10;
       scoreDetails.push("Low mobility: -10");
     }
-    const threats = afterState.getLegalActions().filter(act => act[1] !== -1 && afterState.CurrentPosition[act[0]] === 'T').length;
+    const threats = getLegalActions(afterState).filter(act => act[1] !== -1 && afterState.CurrentPosition[act[0]] === 'T').length;
     if (threats > 0) {
       score += threats * 15;
       scoreDetails.push(`Threats created: +${threats * 15}`);
@@ -191,29 +229,42 @@ export function evaluateDetailedMoveQuality(beforeState, afterState, action, pla
       if (isVulnerable) {
         score -= 30;
         scoreDetails.push("Vulnerable placement: -30");
+      } 
+
+      const blockedTigers = countBlockedTigers(afterState);
+      const previousBlocked = countBlockedTigers(beforeState);
+ 
+      if (blockedTigers > previousBlocked) {
+        score += blockedTigers*300;
+    
+        scoreDetails.push("Tiger blocking: +300");
       }
     } else {
       const fromPos = action[0];
       const toPos = action[2];
       if (isPositionVulnerable(beforeState, fromPos) && !isPositionVulnerable(afterState, toPos)) {
-        score += 40;
+        score += 50;
         scoreDetails.push("Escape from danger: +40");
       }
       const blockedTigers = countBlockedTigers(afterState);
       const previousBlocked = countBlockedTigers(beforeState);
-      if (blockedTigers > previousBlocked) {
-        score += 25;
-        scoreDetails.push("Tiger blocking: +25");
+    
+   
+      if (blockedTigers> previousBlocked) {
+        score += blockedTigers*300;
+   
+        scoreDetails.push("Tiger blocking: +300");
       }
       const connectivity = calculateGoatConnectivity(afterState, toPos);
+      
       if (connectivity >= 3) {
-        score += 20;
+        score += 5*connectivity;
         scoreDetails.push("Good formation: +20");
       }
     }
 
-    const tigerThreats = beforeState.getLegalActions().filter(act => act[1] !== -1 && beforeState.CurrentPosition[act[0]] === 'T').length;
-    const afterThreats = afterState.getLegalActions().filter(act => act[1] !== -1 && afterState.CurrentPosition[act[0]] === 'T').length;
+    const tigerThreats = getLegalActions(beforeState).filter(act => act[1] !== -1 && beforeState.CurrentPosition[act[0]] === 'T').length;
+    const afterThreats = getLegalActions(afterState).filter(act => act[1] !== -1 && afterState.CurrentPosition[act[0]] === 'T').length;
     if (afterThreats < tigerThreats) {
       score += 30;
       scoreDetails.push("Threat reduction: +30");
@@ -232,6 +283,6 @@ export function evaluateDetailedMoveQuality(beforeState, afterState, action, pla
     score += 200;
     scoreDetails.push("Winning move: +200");
   }
-
+  
   return { score: Math.max(0, score), details: scoreDetails };
 }

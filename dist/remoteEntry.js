@@ -13,8 +13,8 @@ var kta_utchol;
     s,
     f,
     d,
-    h,
     c,
+    h,
     p,
     v,
     m,
@@ -28,7 +28,7 @@ var kta_utchol;
       4677: (e, r, t) => {
         var o = {
             "./Mukka": () =>
-              Promise.all([t.e(914), t.e(676), t.e(955), t.e(87)]).then(
+              Promise.all([t.e(914), t.e(676), t.e(869), t.e(87)]).then(
                 () => () => t(1087)
               ),
           },
@@ -58,33 +58,33 @@ var kta_utchol;
         t.d(r, { get: () => n, init: () => a });
       },
     },
-    x = {};
-  function O(e) {
-    var r = x[e];
+    O = {};
+  function P(e) {
+    var r = O[e];
     if (void 0 !== r) return r.exports;
-    var t = (x[e] = { id: e, exports: {} });
-    return j[e](t, t.exports, O), t.exports;
+    var t = (O[e] = { id: e, exports: {} });
+    return j[e](t, t.exports, P), t.exports;
   }
-  (O.m = j),
-    (O.c = x),
-    (O.n = (e) => {
+  (P.m = j),
+    (P.c = O),
+    (P.n = (e) => {
       var r = e && e.__esModule ? () => e.default : () => e;
-      return O.d(r, { a: r }), r;
+      return P.d(r, { a: r }), r;
     }),
-    (O.d = (e, r) => {
+    (P.d = (e, r) => {
       for (var t in r)
-        O.o(r, t) &&
-          !O.o(e, t) &&
+        P.o(r, t) &&
+          !P.o(e, t) &&
           Object.defineProperty(e, t, { enumerable: !0, get: r[t] });
     }),
-    (O.f = {}),
-    (O.e = (e) =>
-      Promise.all(Object.keys(O.f).reduce((r, t) => (O.f[t](e, r), r), []))),
-    (O.u = (e) => e + ".js"),
-    (O.o = (e, r) => Object.prototype.hasOwnProperty.call(e, r)),
+    (P.f = {}),
+    (P.e = (e) =>
+      Promise.all(Object.keys(P.f).reduce((r, t) => (P.f[t](e, r), r), []))),
+    (P.u = (e) => e + ".js"),
+    (P.o = (e, r) => Object.prototype.hasOwnProperty.call(e, r)),
     (e = {}),
     (r = "kta_utchol:"),
-    (O.l = (t, o, n, a) => {
+    (P.l = (t, o, n, a) => {
       if (e[t]) e[t].push(o);
       else {
         var i, u;
@@ -107,12 +107,12 @@ var kta_utchol;
           ((u = !0),
           ((i = document.createElement("script")).charset = "utf-8"),
           (i.timeout = 120),
-          O.nc && i.setAttribute("nonce", O.nc),
+          P.nc && i.setAttribute("nonce", P.nc),
           i.setAttribute("data-webpack", r + n),
           (i.src = t)),
           (e[t] = [o]);
         var d = (r, o) => {
-            (i.onerror = i.onload = null), clearTimeout(h);
+            (i.onerror = i.onload = null), clearTimeout(c);
             var n = e[t];
             if (
               (delete e[t],
@@ -122,7 +122,7 @@ var kta_utchol;
             )
               return r(o);
           },
-          h = setTimeout(
+          c = setTimeout(
             d.bind(null, void 0, { type: "timeout", target: i }),
             12e4
           );
@@ -131,23 +131,23 @@ var kta_utchol;
           u && document.head.appendChild(i);
       }
     }),
-    (O.r = (e) => {
+    (P.r = (e) => {
       "undefined" != typeof Symbol &&
         Symbol.toStringTag &&
         Object.defineProperty(e, Symbol.toStringTag, { value: "Module" }),
         Object.defineProperty(e, "__esModule", { value: !0 });
     }),
     (() => {
-      O.S = {};
+      P.S = {};
       var e = {},
         r = {};
-      O.I = (t, o) => {
+      P.I = (t, o) => {
         o || (o = []);
         var n = r[t];
         if ((n || (n = r[t] = {}), !(o.indexOf(n) >= 0))) {
           if ((o.push(n), e[t])) return e[t];
-          O.o(O.S, t) || (O.S[t] = {});
-          var a = O.S[t],
+          P.o(P.S, t) || (P.S[t] = {});
+          var a = P.S[t],
             i = "kta_utchol",
             u = (e, r, t, o) => {
               var n = (a[e] = a[e] || {}),
@@ -158,22 +158,21 @@ var kta_utchol;
             l = [];
           return (
             "default" === t &&
-              (u("axios", "1.7.9", () => O.e(447).then(() => () => O(4447))),
-              u("react-dom", "18.3.1", () =>
-                Promise.all([O.e(961), O.e(914)]).then(() => () => O(961))
+              (u("react-dom", "18.3.1", () =>
+                Promise.all([P.e(961), P.e(914)]).then(() => () => P(961))
               ),
               u("react-router-dom", "6.28.2", () =>
-                Promise.all([O.e(648), O.e(914), O.e(676)]).then(
-                  () => () => O(2648)
+                Promise.all([P.e(648), P.e(914), P.e(676)]).then(
+                  () => () => P(2648)
                 )
               ),
-              u("react", "18.3.1", () => O.e(540).then(() => () => O(6540)))),
+              u("react", "18.3.1", () => P.e(540).then(() => () => P(6540)))),
             (e[t] = l.length ? Promise.all(l).then(() => (e[t] = 1)) : 1)
           );
         }
       };
     })(),
-    (O.p = ""),
+    (P.p = ""),
     (t = (e) => {
       var r = (e) => e.split(".").map((e) => (+e == e ? +e : e)),
         t = /^([^-+]+)?(?:-([^+]+))?(?:\+(.+))?$/.exec(e),
@@ -273,15 +272,15 @@ var kta_utchol;
           else "s" != d && "n" != d && ((l = !1), u--);
         }
       }
-      var h = [],
-        c = h.pop.bind(h);
+      var c = [],
+        h = c.pop.bind(c);
       for (i = 1; i < e.length; i++) {
         var p = e[i];
-        h.push(1 == p ? c() | c() : 2 == p ? c() & c() : p ? a(p, r) : !c());
+        c.push(1 == p ? h() | h() : 2 == p ? h() & h() : p ? a(p, r) : !h());
       }
-      return !!c();
+      return !!h();
     }),
-    (i = (e, r) => e && O.o(e, r)),
+    (i = (e, r) => e && P.o(e, r)),
     (u = (e) => ((e.loaded = 1), e.get())),
     (l = (e) =>
       Object.keys(e).reduce((r, t) => (e[t].eager && (r[t] = e[t]), r), {})),
@@ -311,7 +310,7 @@ var kta_utchol;
       " (required " +
       n(o) +
       ")"),
-    (h = (e, r, t, o, a) => {
+    (c = (e, r, t, o, a) => {
       var i = e[t];
       return (
         "No satisfying version (" +
@@ -328,7 +327,7 @@ var kta_utchol;
           .join(", ")
       );
     }),
-    (c = (e) => {
+    (h = (e) => {
       throw new Error(e);
     }),
     (p = (e) => {
@@ -338,20 +337,20 @@ var kta_utchol;
       t
         ? t()
         : ((e, r) =>
-            c("Shared module " + r + " doesn't exist in shared scope " + e))(
+            h("Shared module " + r + " doesn't exist in shared scope " + e))(
             e,
             r
           )),
     (g = (v = (e) =>
       function (r, t, o, n, a) {
-        var i = O.I(r);
+        var i = P.I(r);
         return i && i.then && !o
-          ? i.then(e.bind(e, r, O.S[r], t, !1, n, a))
-          : e(r, O.S[r], t, o, n, a);
+          ? i.then(e.bind(e, r, P.S[r], t, !1, n, a))
+          : e(r, P.S[r], t, o, n, a);
       })((e, r, t, o, n, a) => {
       if (!i(r, t)) return m(e, t, a);
       var l = s(r, t, n, o);
-      return l ? u(l) : a ? a() : void c(h(r, e, t, n, o));
+      return l ? u(l) : a ? a() : void h(c(r, e, t, n, o));
     })),
     (b = v((e, r, t, o, n, l) => {
       if (!i(r, t)) return m(e, t, l);
@@ -362,39 +361,35 @@ var kta_utchol;
     (k = {
       4914: () =>
         b("default", "react", !1, [1, 18, 2, 0], () =>
-          O.e(540).then(() => () => O(6540))
+          P.e(540).then(() => () => P(6540))
         ),
       676: () =>
         b("default", "react-dom", !1, [1, 18, 3, 1], () =>
-          O.e(961).then(() => () => O(961))
-        ),
-      8606: () =>
-        g("default", "axios", !1, [1, 1, 7, 9], () =>
-          O.e(447).then(() => () => O(4447))
+          P.e(961).then(() => () => P(961))
         ),
       9180: () =>
         g("default", "react-router-dom", !1, [1, 6, 28, 2], () =>
-          O.e(648).then(() => () => O(2648))
+          P.e(648).then(() => () => P(2648))
         ),
     }),
-    (w = { 676: [676], 914: [4914], 955: [8606, 9180] }),
+    (w = { 676: [676], 869: [9180], 914: [4914] }),
     (S = {}),
-    (O.f.consumes = (e, r) => {
-      O.o(w, e) &&
+    (P.f.consumes = (e, r) => {
+      P.o(w, e) &&
         w[e].forEach((e) => {
-          if (O.o(y, e)) return r.push(y[e]);
+          if (P.o(y, e)) return r.push(y[e]);
           if (!S[e]) {
             var t = (r) => {
               (y[e] = 0),
-                (O.m[e] = (t) => {
-                  delete O.c[e], (t.exports = r());
+                (P.m[e] = (t) => {
+                  delete P.c[e], (t.exports = r());
                 });
             };
             S[e] = !0;
             var o = (r) => {
               delete y[e],
-                (O.m[e] = (t) => {
-                  throw (delete O.c[e], r);
+                (P.m[e] = (t) => {
+                  throw (delete P.c[e], r);
                 });
             };
             try {
@@ -407,22 +402,22 @@ var kta_utchol;
         });
     }),
     (() => {
-      O.b = document.baseURI || self.location.href;
+      P.b = document.baseURI || self.location.href;
       var e = { 161: 0 };
-      O.f.j = (r, t) => {
-        var o = O.o(e, r) ? e[r] : void 0;
+      P.f.j = (r, t) => {
+        var o = P.o(e, r) ? e[r] : void 0;
         if (0 !== o)
           if (o) t.push(o[2]);
           else if (/^(676|914)$/.test(r)) e[r] = 0;
           else {
             var n = new Promise((t, n) => (o = e[r] = [t, n]));
             t.push((o[2] = n));
-            var a = O.p + O.u(r),
+            var a = P.p + P.u(r),
               i = new Error();
-            O.l(
+            P.l(
               a,
               (t) => {
-                if (O.o(e, r) && (0 !== (o = e[r]) && (e[r] = void 0), o)) {
+                if (P.o(e, r) && (0 !== (o = e[r]) && (e[r] = void 0), o)) {
                   var n = t && ("load" === t.type ? "missing" : t.type),
                     a = t && t.target && t.target.src;
                   (i.message =
@@ -444,16 +439,16 @@ var kta_utchol;
             [a, i, u] = t,
             l = 0;
           if (a.some((r) => 0 !== e[r])) {
-            for (o in i) O.o(i, o) && (O.m[o] = i[o]);
-            u && u(O);
+            for (o in i) P.o(i, o) && (P.m[o] = i[o]);
+            u && u(P);
           }
           for (r && r(t); l < a.length; l++)
-            (n = a[l]), O.o(e, n) && e[n] && e[n][0](), (e[n] = 0);
+            (n = a[l]), P.o(e, n) && e[n] && e[n][0](), (e[n] = 0);
         },
         t = (self.webpackChunkkta_utchol = self.webpackChunkkta_utchol || []);
       t.forEach(r.bind(null, 0)), (t.push = r.bind(null, t.push.bind(t)));
     })(),
-    (O.nc = void 0);
-  var P = O(4677);
-  kta_utchol = P;
+    (P.nc = void 0);
+  var E = P(4677);
+  kta_utchol = E;
 })();

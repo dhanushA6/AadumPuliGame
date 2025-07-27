@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import "../styles/HomePage.css";
 import HelpOverlay from '../components/HelpOverlay';
 import gameControlIcon from "../images/playButton.gif";
-import helperGif from "../images/helper.gif";
+import helperGif from "../images/help.png";
 
 
 const HomePage = () => {

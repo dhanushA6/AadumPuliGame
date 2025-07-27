@@ -10,7 +10,7 @@ import { preloadImages, preloadSounds } from "./utils/preloadAssets";
 const App = () => {
  
   const [userID, setUserID] = useState(51);
-  const [levelValue, setLevelValue] = useState(4); 
+  const [levelValue, setLevelValue] = useState(3); 
   // const [mode, setMode] = useState('freeplay');
   const [error, setError] = useState(null);
 

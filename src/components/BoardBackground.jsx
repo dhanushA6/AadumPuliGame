@@ -96,7 +96,7 @@ width="1100" height="600" x="-301.1245198057395" y="-132.5526652914786">
         y={-125.7 + BOX_HEIGHT / 2 + 8}
         fontSize="22"
         fontWeight="700"
-        fill={winChanceValue > 70 ? '#4CAF50' : winChanceValue < 30 ? '#ff6b6b' : '#222'}
+        fill='#222'
         textAnchor="start"
         alignmentBaseline="middle"
       >

@@ -94,7 +94,8 @@ function TigersAndGoats({ userID, level, difficulty: propDifficulty }) {
   const [lastMovePlayer, setLastMovePlayer] = useState(null);
   const [lastMoveTo, setLastMoveTo] = useState(null);
   const [elapsedTime, setElapsedTime] = useState(GAME_TIME_LIMIT);
-  const [isMusicMuted, setIsMusicMuted] = useState(false);
+  const [isMusicMuted, setIsMusicMuted] = useState(false
+  );
   const [lastUserProb, setLastUserProb] = useState(0);
   const [showResultOverlay, setShowResultOverlay] = useState(false);
 
@@ -226,7 +227,7 @@ function TigersAndGoats({ userID, level, difficulty: propDifficulty }) {
     
     // Calculate move quality score
     const moveQuality = evaluateDetailedMoveQuality(currentGameState, newGameState, action, currentPlayer);
-    console.log(tigerScore, goatScore)
+    // console.log(tigerScore, goatScore)
     // Update scores and move counts
     if (currentPlayer === 0) { // Tiger move
       setTigerScore(prev => prev + moveQuality.score);
